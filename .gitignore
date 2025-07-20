@@ -1,3 +1,5 @@
 .cursor/*
 .cursorignore
 !.cursor/*.example*
+
+.ccsh_history
