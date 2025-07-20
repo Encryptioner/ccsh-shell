@@ -311,13 +311,19 @@ void expand_alias(char* line, char* out, size_t out_size) {
 void print_help() {
     printf("ccsh - Compact C Shell\n");
     printf("Supported features:\n");
-    printf("  Built-in commands: cd, pwd, exit, help, fg, jobs, alias, unalias\n");
+    printf("  Built-in commands: cd, pwd, exit, help, fg, jobs, alias, unalias, path\n");
+    printf("  External programs: All programs in PATH (e.g., sudo, ls, cat, etc.)\n");
     printf("  I/O Redirection: < (input), > (output), >> (append)\n");
     printf("  Background jobs: & (with fg and jobs to control)\n");
     printf("  Globbing: *, ? (filename pattern matching)\n");
     printf("  Aliases: alias name='value', unalias name\n");
     printf("  Command history with arrow keys (if readline available)\n");
     printf("  Signal handling: Ctrl+C to interrupt\n");
+    printf("\nExamples:\n");
+    printf("  path                    - Show PATH environment variable\n");
+    printf("  sudo ls -la             - Run sudo with arguments\n");
+    printf("  ls *.txt > files.txt   - Redirect output to file\n");
+    printf("  sleep 10 &             - Run command in background\n");
 }
 
 /**
@@ -475,6 +481,18 @@ int main() {
         /* Help command */
         if (strcmp(args[0], "help") == 0) {
             print_help();
+            free(line);
+            continue;
+        }
+        
+        /* Show PATH environment variable */
+        if (strcmp(args[0], "path") == 0) {
+            const char* path = getenv("PATH");
+            if (path) {
+                printf("PATH=%s\n", path);
+            } else {
+                printf("PATH environment variable not set\n");
+            }
             free(line);
             continue;
         }
