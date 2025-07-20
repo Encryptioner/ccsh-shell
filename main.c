@@ -311,7 +311,7 @@ void expand_alias(char* line, char* out, size_t out_size) {
 void print_help() {
     printf("ccsh - Compact C Shell\n");
     printf("Supported features:\n");
-    printf("  Built-in commands: cd, pwd, exit, help, fg, jobs, alias, unalias, path\n");
+    printf("  Built-in commands: cd, pwd, exit, help, fg, jobs, alias, unalias, path, which\n");
     printf("  External programs: All programs in PATH (e.g., sudo, ls, cat, etc.)\n");
     printf("  I/O Redirection: < (input), > (output), >> (append)\n");
     printf("  Background jobs: & (with fg and jobs to control)\n");
@@ -321,6 +321,8 @@ void print_help() {
     printf("  Signal handling: Ctrl+C to interrupt\n");
     printf("\nExamples:\n");
     printf("  path                    - Show PATH environment variable\n");
+    printf("  which ls                - Find location of ls command\n");
+    printf("  which sudo              - Find location of sudo command\n");
     printf("  sudo ls -la             - Run sudo with arguments\n");
     printf("  ls *.txt > files.txt   - Redirect output to file\n");
     printf("  sleep 10 &             - Run command in background\n");
@@ -493,6 +495,47 @@ int main() {
             } else {
                 printf("PATH environment variable not set\n");
             }
+            free(line);
+            continue;
+        }
+        
+        /* Which command - find executable in PATH */
+        if (strcmp(args[0], "which") == 0) {
+            if (!args[1]) {
+                fprintf(stderr, "Usage: which <command>\n");
+                free(line);
+                continue;
+            }
+            
+            const char* path_env = getenv("PATH");
+            if (!path_env) {
+                fprintf(stderr, "PATH environment variable not set\n");
+                free(line);
+                continue;
+            }
+            
+            char* path_copy = strdup(path_env);
+            char* dir = strtok(path_copy, ":");
+            int found = 0;
+            
+            while (dir != NULL) {
+                char full_path[1024];
+                snprintf(full_path, sizeof(full_path), "%s/%s", dir, args[1]);
+                
+                if (access(full_path, X_OK) == 0) {
+                    printf("%s\n", full_path);
+                    found = 1;
+                    break;
+                }
+                
+                dir = strtok(NULL, ":");
+            }
+            
+            if (!found) {
+                fprintf(stderr, "which: %s not found\n", args[1]);
+            }
+            
+            free(path_copy);
             free(line);
             continue;
         }
