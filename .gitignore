@@ -1,3 +1,21 @@
 .cursor/*
 .cursorignore
 !.cursor/*.example*
+
+.vscode/*
+!.vscode/*.example*
+
+.ccsh_history
+
+# Build artifacts
+*.o
+*.d
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db

@@ -34,6 +34,7 @@
 #include <glob.h>       /* Pathname pattern matching: glob, GLOB_TILDE, GLOB_APPEND */
 #include <signal.h>     /* Signal handling: signal, SIGINT, SIG_DFL */
 #include <errno.h>      /* Error codes and error handling */
+#include <ctype.h>      /* Character classification: tolower */
 
 /* Readline library support - available on macOS and Linux */
 #if __APPLE__ || __linux__
@@ -306,18 +307,189 @@ void expand_alias(char* line, char* out, size_t out_size) {
 }
 
 /**
+ * Simple pattern matching function for grep
+ * @param text Text to search in
+ * @param pattern Pattern to search for
+ * @param case_insensitive Whether to ignore case
+ * @return 1 if pattern matches, 0 otherwise
+ */
+int simple_match(const char* text, const char* pattern, int case_insensitive) {
+    if (!text || !pattern) return 0;
+    
+    char* text_copy = strdup(text);
+    char* pattern_copy = strdup(pattern);
+    
+    if (case_insensitive) {
+        /* Convert to lowercase for case-insensitive matching */
+        for (int i = 0; text_copy[i]; i++) {
+            text_copy[i] = tolower(text_copy[i]);
+        }
+        for (int i = 0; pattern_copy[i]; i++) {
+            pattern_copy[i] = tolower(pattern_copy[i]);
+        }
+    }
+    
+    int result = strstr(text_copy, pattern_copy) != NULL;
+    
+    free(text_copy);
+    free(pattern_copy);
+    return result;
+}
+
+/**
+ * Built-in grep command implementation
+ * @param args Command arguments
+ * @return 0 on success, 1 on error
+ */
+int builtin_grep(char** args) {
+    if (!args[1]) {
+        fprintf(stderr, "Usage: grep [options] pattern [file...]\n");
+        fprintf(stderr, "Options:\n");
+        fprintf(stderr, "  -i    Ignore case\n");
+        fprintf(stderr, "  -n    Show line numbers\n");
+        fprintf(stderr, "  -v    Invert match (show non-matching lines)\n");
+        fprintf(stderr, "  -c    Count matching lines only\n");
+        return 1;
+    }
+    
+    int case_insensitive = 0;
+    int show_line_numbers = 0;
+    int invert_match = 0;
+    int count_only = 0;
+    char* pattern = NULL;
+    int file_count = 0;
+    char** files = NULL;
+    
+    /* Parse options and arguments */
+    for (int i = 1; args[i] != NULL; i++) {
+        if (args[i][0] == '-' && args[i][1] != '\0') {
+            /* Option */
+            for (int j = 1; args[i][j] != '\0'; j++) {
+                switch (args[i][j]) {
+                    case 'i':
+                        case_insensitive = 1;
+                        break;
+                    case 'n':
+                        show_line_numbers = 1;
+                        break;
+                    case 'v':
+                        invert_match = 1;
+                        break;
+                    case 'c':
+                        count_only = 1;
+                        break;
+                    default:
+                        fprintf(stderr, "grep: invalid option -- '%c'\n", args[i][j]);
+                        return 1;
+                }
+            }
+        } else {
+            /* Non-option argument */
+            if (!pattern) {
+                pattern = args[i];
+            } else {
+                /* File argument */
+                file_count++;
+                files = realloc(files, file_count * sizeof(char*));
+                files[file_count - 1] = args[i];
+            }
+        }
+    }
+    
+    if (!pattern) {
+        fprintf(stderr, "grep: no pattern specified\n");
+        free(files);
+        return 1;
+    }
+    
+    /* If no files specified, read from stdin */
+    if (file_count == 0) {
+        files = malloc(sizeof(char*));
+        files[0] = NULL;  /* NULL means stdin */
+        file_count = 1;
+    }
+    
+    /* Process each file */
+    for (int file_idx = 0; file_idx < file_count; file_idx++) {
+        FILE* file = stdin;
+        char* filename = files[file_idx];
+        
+        if (filename) {
+            file = fopen(filename, "r");
+            if (!file) {
+                fprintf(stderr, "grep: %s: No such file or directory\n", filename);
+                continue;
+            }
+        }
+        
+        char line[4096];
+        int line_number = 0;
+        int match_count = 0;
+        
+        while (fgets(line, sizeof(line), file)) {
+            line_number++;
+            
+            /* Remove newline */
+            size_t len = strlen(line);
+            if (len > 0 && line[len-1] == '\n') {
+                line[len-1] = '\0';
+            }
+            
+            int matches = simple_match(line, pattern, case_insensitive);
+            if (invert_match) matches = !matches;
+            
+            if (matches) {
+                match_count++;
+                if (!count_only) {
+                    if (file_count > 1 && filename) {
+                        printf("%s:", filename);
+                    }
+                    if (show_line_numbers) {
+                        printf("%d:", line_number);
+                    }
+                    printf("%s\n", line);
+                }
+            }
+        }
+        
+        if (count_only && filename) {
+            printf("%d\n", match_count);
+        } else if (count_only && !filename) {
+            printf("%d\n", match_count);
+        }
+        
+        if (filename) {
+            fclose(file);
+        }
+    }
+    
+    free(files);
+    return 0;
+}
+
+/**
  * Display help information about shell features
  */
 void print_help() {
     printf("ccsh - Compact C Shell\n");
     printf("Supported features:\n");
-    printf("  Built-in commands: cd, pwd, exit, help, fg, jobs, alias, unalias\n");
+    printf("  Built-in commands: cd, pwd, exit, help, fg, jobs, alias, unalias, path, which, grep\n");
+    printf("  External programs: All programs in PATH (e.g., sudo, ls, cat, etc.)\n");
     printf("  I/O Redirection: < (input), > (output), >> (append)\n");
     printf("  Background jobs: & (with fg and jobs to control)\n");
     printf("  Globbing: *, ? (filename pattern matching)\n");
     printf("  Aliases: alias name='value', unalias name\n");
     printf("  Command history with arrow keys (if readline available)\n");
     printf("  Signal handling: Ctrl+C to interrupt\n");
+    printf("\nExamples:\n");
+    printf("  path                    - Show PATH environment variable\n");
+    printf("  which ls                - Find location of ls command\n");
+    printf("  which sudo              - Find location of sudo command\n");
+    printf("  sudo ls -la             - Run sudo with arguments\n");
+    printf("  ls *.txt > files.txt   - Redirect output to file\n");
+    printf("  sleep 10 &             - Run command in background\n");
+    printf("  grep pattern file.txt   - Search for pattern in file\n");
+    printf("  grep -i -n hello *.txt - Case-insensitive search with line numbers\n");
 }
 
 /**
@@ -475,6 +647,66 @@ int main() {
         /* Help command */
         if (strcmp(args[0], "help") == 0) {
             print_help();
+            free(line);
+            continue;
+        }
+        
+        /* Show PATH environment variable */
+        if (strcmp(args[0], "path") == 0) {
+            const char* path = getenv("PATH");
+            if (path) {
+                printf("PATH=%s\n", path);
+            } else {
+                printf("PATH environment variable not set\n");
+            }
+            free(line);
+            continue;
+        }
+        
+        /* Which command - find executable in PATH */
+        if (strcmp(args[0], "which") == 0) {
+            if (!args[1]) {
+                fprintf(stderr, "Usage: which <command>\n");
+                free(line);
+                continue;
+            }
+            
+            const char* path_env = getenv("PATH");
+            if (!path_env) {
+                fprintf(stderr, "PATH environment variable not set\n");
+                free(line);
+                continue;
+            }
+            
+            char* path_copy = strdup(path_env);
+            char* dir = strtok(path_copy, ":");
+            int found = 0;
+            
+            while (dir != NULL) {
+                char full_path[1024];
+                snprintf(full_path, sizeof(full_path), "%s/%s", dir, args[1]);
+                
+                if (access(full_path, X_OK) == 0) {
+                    printf("%s\n", full_path);
+                    found = 1;
+                    break;
+                }
+                
+                dir = strtok(NULL, ":");
+            }
+            
+            if (!found) {
+                fprintf(stderr, "which: %s not found\n", args[1]);
+            }
+            
+            free(path_copy);
+            free(line);
+            continue;
+        }
+        
+        /* Built-in grep command */
+        if (strcmp(args[0], "grep") == 0) {
+            builtin_grep(args);
             free(line);
             continue;
         }
