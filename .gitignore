@@ -2,4 +2,7 @@
 .cursorignore
 !.cursor/*.example*
 
+.vscode/*
+!.vscode/*.example*
+
 .ccsh_history
