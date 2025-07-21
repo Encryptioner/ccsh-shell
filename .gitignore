@@ -8,7 +8,6 @@
 .ccsh_history
 
 # Build artifacts
-ccsh
 *.o
 *.d
 
