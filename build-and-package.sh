@@ -1,13 +1,9 @@
 #!/bin/bash
-# build-and-package.sh
-# Script to build and package ccsh shell for distribution
 
-set -e  # Exit on any error
+# Cross-platform build script for ccsh
+# Supports macOS, Ubuntu/Debian, CentOS/RHEL, FreeBSD, OpenBSD, NetBSD
 
-# Configuration
-VERSION="1.0.0"
-NAME="ccsh"
-DESCRIPTION="Compact C Shell - A small yet flexible Unix-like shell in C"
+set -e
 
 # Colors for output
 RED='\033[0;31m'
@@ -16,187 +12,253 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-# Functions
-print_status() {
-    echo -e "${BLUE}[INFO]${NC} $1"
+# Platform detection
+detect_platform() {
+    case "$(uname -s)" in
+        Darwin*)    echo "macos" ;;
+        Linux*)     echo "linux" ;;
+        FreeBSD*)   echo "freebsd" ;;
+        OpenBSD*)   echo "openbsd" ;;
+        NetBSD*)    echo "netbsd" ;;
+        *)          echo "unknown" ;;
+    esac
 }
 
-print_success() {
-    echo -e "${GREEN}[SUCCESS]${NC} $1"
+# Check if command exists
+command_exists() {
+    command -v "$1" >/dev/null 2>&1
 }
 
-print_warning() {
-    echo -e "${YELLOW}[WARNING]${NC} $1"
+# Install dependencies for different platforms
+install_dependencies() {
+    local platform=$(detect_platform)
+    
+    echo -e "${BLUE}[INFO] Detected platform: $platform${NC}"
+    
+    case $platform in
+        "linux")
+            if command_exists apt-get; then
+                echo -e "${BLUE}[INFO] Installing dependencies for Ubuntu/Debian...${NC}"
+                sudo apt-get update
+                sudo apt-get install -y build-essential libreadline-dev
+            elif command_exists yum; then
+                echo -e "${BLUE}[INFO] Installing dependencies for CentOS/RHEL...${NC}"
+                sudo yum groupinstall -y "Development Tools"
+                sudo yum install -y readline-devel
+            elif command_exists dnf; then
+                echo -e "${BLUE}[INFO] Installing dependencies for Fedora...${NC}"
+                sudo dnf groupinstall -y "Development Tools"
+                sudo dnf install -y readline-devel
+            elif command_exists pacman; then
+                echo -e "${BLUE}[INFO] Installing dependencies for Arch Linux...${NC}"
+                sudo pacman -S --needed base-devel readline
+            else
+                echo -e "${YELLOW}[WARN] Unknown Linux distribution. Please install:${NC}"
+                echo "  - gcc (or clang)"
+                echo "  - make"
+                echo "  - readline development headers"
+            fi
+            ;;
+        "macos")
+            if command_exists brew; then
+                echo -e "${BLUE}[INFO] Installing dependencies via Homebrew...${NC}"
+                brew install readline
+            else
+                echo -e "${YELLOW}[WARN] Homebrew not found. Please install:${NC}"
+                echo "  - Xcode Command Line Tools: xcode-select --install"
+                echo "  - Homebrew: /bin/bash -c \"\$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)\""
+                echo "  - readline: brew install readline"
+            fi
+            ;;
+        "freebsd")
+            echo -e "${BLUE}[INFO] Installing dependencies for FreeBSD...${NC}"
+            sudo pkg install -y gcc readline
+            ;;
+        "openbsd")
+            echo -e "${BLUE}[INFO] Installing dependencies for OpenBSD...${NC}"
+            sudo pkg_add gcc readline
+            ;;
+        "netbsd")
+            echo -e "${BLUE}[INFO] Installing dependencies for NetBSD...${NC}"
+            sudo pkgin install gcc readline
+            ;;
+        *)
+            echo -e "${RED}[ERROR] Unsupported platform: $platform${NC}"
+            exit 1
+            ;;
+    esac
 }
 
-print_error() {
-    echo -e "${RED}[ERROR]${NC} $1"
-}
-
-# Check if we're in the right directory
-if [ ! -f "main.c" ] || [ ! -f "Makefile" ]; then
-    print_error "This script must be run from the ccsh project root directory"
-    exit 1
-fi
-
-print_status "Building $NAME version $VERSION..."
-
-# Clean previous builds
-print_status "Cleaning previous builds..."
-make clean
-
-# Detect OS
-OS=$(uname -s)
-ARCH=$(uname -m)
-print_status "Detected OS: $OS ($ARCH)"
-
-# Build static binary
-print_status "Building static binary..."
-if [ "$OS" = "Darwin" ]; then
-    print_warning "Static linking not fully supported on macOS, using standard linking"
-    make
-else
-    make static
-fi
-
-# Check if build was successful
-if [ ! -f "ccsh" ]; then
-    print_error "Build failed - ccsh executable not found"
-    exit 1
-fi
-
-# Get file size
-EXEC_SIZE=$(du -h ccsh | cut -f1)
-print_success "Build completed successfully (Size: $EXEC_SIZE)"
-
-# Create distribution directory
-DIST_DIR="dist/$NAME-$VERSION-$OS-$ARCH"
-print_status "Creating distribution directory: $DIST_DIR"
-mkdir -p "$DIST_DIR"
-
-# Copy files
-print_status "Copying files to distribution directory..."
-cp ccsh "$DIST_DIR/"
-cp README.md "$DIST_DIR/"
-cp test.sh "$DIST_DIR/" 2>/dev/null || print_warning "test.sh not found"
-cp docs/*.md "$DIST_DIR/" 2>/dev/null || print_warning "docs directory not found"
-
-# Create installation script
-cat > "$DIST_DIR/install.sh" << 'EOF'
-#!/bin/bash
-# install.sh - Installation script for ccsh
-
-set -e
-
-echo "Installing ccsh..."
-
-# Check if running as root for system-wide installation
-if [ "$EUID" -eq 0 ]; then
-    INSTALL_DIR="/usr/local/bin"
-    echo "Installing system-wide to $INSTALL_DIR"
-else
-    INSTALL_DIR="$HOME/.local/bin"
-    echo "Installing to user directory: $INSTALL_DIR"
-    mkdir -p "$INSTALL_DIR"
-fi
-
-# Copy executable
-cp ccsh "$INSTALL_DIR/"
-chmod +x "$INSTALL_DIR/ccsh"
-
-echo "ccsh installed successfully to $INSTALL_DIR/ccsh"
-echo ""
-echo "To use ccsh as your default shell:"
-echo "1. Add to /etc/shells (requires sudo):"
-echo "   echo '$INSTALL_DIR/ccsh' | sudo tee -a /etc/shells"
-echo "2. Change your shell:"
-echo "   chsh -s $INSTALL_DIR/ccsh"
-echo "3. Log out and log back in"
-echo ""
-echo "To run ccsh directly:"
-echo "   $INSTALL_DIR/ccsh"
+# Check if readline is available
+check_readline() {
+    echo -e "${BLUE}[INFO] Checking for readline library...${NC}"
+    
+    # Try to compile a simple test program
+    cat > /tmp/readline_test.c << 'EOF'
+#include <stdio.h>
+#ifdef HAVE_READLINE
+#include <readline/readline.h>
+int main() { return 0; }
+#else
+int main() { return 1; }
+#endif
 EOF
+    
+    if gcc -DHAVE_READLINE -lreadline /tmp/readline_test.c -o /tmp/readline_test 2>/dev/null; then
+        echo -e "${GREEN}[SUCCESS] Readline library found${NC}"
+        rm -f /tmp/readline_test.c /tmp/readline_test
+        return 0
+    else
+        echo -e "${YELLOW}[WARN] Readline library not found${NC}"
+        rm -f /tmp/readline_test.c /tmp/readline_test
+        return 1
+    fi
+}
 
-chmod +x "$DIST_DIR/install.sh"
+# Build the project
+build_project() {
+    local build_type=$1
+    
+    echo -e "${BLUE}[INFO] Building ccsh...${NC}"
+    
+    case $build_type in
+        "normal")
+            make clean
+            make all
+            ;;
+        "static")
+            make clean
+            make static
+            ;;
+        "debug")
+            make clean
+            make debug
+            ;;
+        *)
+            echo -e "${RED}[ERROR] Unknown build type: $build_type${NC}"
+            exit 1
+            ;;
+    esac
+    
+    if [ -f "ccsh" ]; then
+        echo -e "${GREEN}[SUCCESS] Build completed successfully${NC}"
+        echo -e "${BLUE}[INFO] Binary size: $(ls -lh ccsh | awk '{print $5}')${NC}"
+    else
+        echo -e "${RED}[ERROR] Build failed${NC}"
+        exit 1
+    fi
+}
 
-# Create uninstall script
-cat > "$DIST_DIR/uninstall.sh" << 'EOF'
-#!/bin/bash
-# uninstall.sh - Uninstallation script for ccsh
+# Test the build
+test_build() {
+    echo -e "${BLUE}[INFO] Testing ccsh...${NC}"
+    
+    if [ ! -f "ccsh" ]; then
+        echo -e "${RED}[ERROR] ccsh binary not found${NC}"
+        exit 1
+    fi
+    
+    # Simple test
+    echo "echo 'Hello from ccsh'" | ./ccsh > /tmp/ccsh_test.out 2>&1
+    if grep -q "Hello from ccsh" /tmp/ccsh_test.out; then
+        echo -e "${GREEN}[SUCCESS] Basic functionality test passed${NC}"
+    else
+        echo -e "${YELLOW}[WARN] Basic functionality test failed${NC}"
+    fi
+    rm -f /tmp/ccsh_test.out
+}
 
-set -e
+# Show help
+show_help() {
+    echo "Usage: $0 [OPTIONS]"
+    echo ""
+    echo "Options:"
+    echo "  -h, --help          Show this help message"
+    echo "  -d, --deps          Install dependencies"
+    echo "  -c, --check         Check dependencies"
+    echo "  -b, --build TYPE    Build project (TYPE: normal, static, debug)"
+    echo "  -t, --test          Test the build"
+    echo "  -a, --all           Install deps, build, and test"
+    echo ""
+    echo "Examples:"
+    echo "  $0 -d              # Install dependencies"
+    echo "  $0 -b normal       # Build normally"
+    echo "  $0 -b static       # Build static binary"
+    echo "  $0 -a              # Full build process"
+}
 
-echo "Uninstalling ccsh..."
+# Main script
+main() {
+    local install_deps=false
+    local check_deps=false
+    local build_type="normal"
+    local test_build_flag=false
+    local all_flag=false
+    
+    # Parse command line arguments
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            -h|--help)
+                show_help
+                exit 0
+                ;;
+            -d|--deps)
+                install_deps=true
+                shift
+                ;;
+            -c|--check)
+                check_deps=true
+                shift
+                ;;
+            -b|--build)
+                build_type="$2"
+                shift 2
+                ;;
+            -t|--test)
+                test_build_flag=true
+                shift
+                ;;
+            -a|--all)
+                all_flag=true
+                shift
+                ;;
+            *)
+                echo -e "${RED}[ERROR] Unknown option: $1${NC}"
+                show_help
+                exit 1
+                ;;
+        esac
+    done
+    
+    # Handle --all flag
+    if [ "$all_flag" = true ]; then
+        install_deps=true
+        build_type="normal"
+        test_build_flag=true
+    fi
+    
+    # Install dependencies if requested
+    if [ "$install_deps" = true ]; then
+        install_dependencies
+    fi
+    
+    # Check dependencies if requested
+    if [ "$check_deps" = true ]; then
+        check_readline
+    fi
+    
+    # Build if requested
+    if [ "$build_type" != "none" ]; then
+        build_project "$build_type"
+    fi
+    
+    # Test if requested
+    if [ "$test_build_flag" = true ]; then
+        test_build
+    fi
+    
+    echo -e "${GREEN}[SUCCESS] All operations completed successfully${NC}"
+}
 
-# Check if running as root for system-wide installation
-if [ "$EUID" -eq 0 ]; then
-    INSTALL_DIR="/usr/local/bin"
-else
-    INSTALL_DIR="$HOME/.local/bin"
-fi
-
-if [ -f "$INSTALL_DIR/ccsh" ]; then
-    rm -f "$INSTALL_DIR/ccsh"
-    echo "ccsh removed from $INSTALL_DIR"
-else
-    echo "ccsh not found in $INSTALL_DIR"
-fi
-
-echo "Uninstallation complete"
-EOF
-
-chmod +x "$DIST_DIR/uninstall.sh"
-
-# Create package information
-cat > "$DIST_DIR/PACKAGE_INFO" << EOF
-Package: $NAME
-Version: $VERSION
-Description: $DESCRIPTION
-OS: $OS
-Architecture: $ARCH
-Build Date: $(date)
-Executable Size: $EXEC_SIZE
-
-Files included:
-- ccsh (main executable)
-- README.md (documentation)
-- install.sh (installation script)
-- uninstall.sh (uninstallation script)
-- test.sh (test script, if available)
-- Documentation files (if available)
-
-Installation:
-1. Extract the package
-2. Run: ./install.sh
-3. Follow the instructions provided
-
-Usage:
-- Run directly: ./ccsh
-- Set as default shell: Follow install.sh instructions
-EOF
-
-# Create compressed package
-cd dist
-PACKAGE_NAME="$NAME-$VERSION-$OS-$ARCH.tar.gz"
-tar -czf "$PACKAGE_NAME" "$NAME-$VERSION-$OS-$ARCH/"
-
-# Get package size
-PACKAGE_SIZE=$(du -h "$PACKAGE_NAME" | cut -f1)
-
-print_success "Package created successfully!"
-print_status "Package: $PACKAGE_NAME"
-print_status "Size: $PACKAGE_SIZE"
-print_status "Location: dist/$PACKAGE_NAME"
-
-# Create checksum
-print_status "Creating checksum..."
-sha256sum "$PACKAGE_NAME" > "$PACKAGE_NAME.sha256"
-
-# Show package contents
-print_status "Package contents:"
-tar -tzf "$PACKAGE_NAME" | sed 's/^/  /'
-
-echo ""
-print_success "Distribution package ready!"
-print_status "You can now distribute: dist/$PACKAGE_NAME"
-print_status "Include both the .tar.gz and .sha256 files for verification" 
+# Run main function with all arguments
+main "$@" 

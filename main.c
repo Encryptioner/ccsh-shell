@@ -36,11 +36,15 @@
 #include <errno.h>      /* Error codes and error handling */
 #include <ctype.h>      /* Character classification: tolower */
 
-/* Readline library support - available on macOS and Linux */
-#if __APPLE__ || __linux__
-    #include <readline/readline.h>  /* Interactive command line editing */
-    #include <readline/history.h>   /* Command history management */
-    #define READLINE_LIB 1
+/* Readline library support - cross-platform detection */
+#if defined(__APPLE__) || defined(__linux__) || defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__NetBSD__)
+    #ifdef HAVE_READLINE
+        #include <readline/readline.h>  /* Interactive command line editing */
+        #include <readline/history.h>   /* Command history management */
+        #define READLINE_LIB 1
+    #else
+        #define READLINE_LIB 0
+    #endif
 #else
     #define READLINE_LIB 0
 #endif

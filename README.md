@@ -1,440 +1,259 @@
-# ccsh — Compact C Shell
+# ccsh - Compact C Shell
 
-A small yet flexible Unix‑like shell in C featuring:
-- Interactive prompt with colors and command history
-- Command execution, pipes, and I/O redirection
-- Background job management with `jobs` and `fg`
-- Command aliasing and globbing (wildcard expansion)
-- Built-in commands: cd, pwd, exit, help, alias, unalias
-- Command history & arrow keys via readline (when available)
-- Signal handling (Ctrl+C, Ctrl+Z)
-- Cross-platform support (Linux/macOS)
+A small yet powerful Unix-like shell written in C, featuring interactive command line editing, job control, aliases, and more.
 
-## Installation
+## Features
+
+- **Interactive Command Line**: Full readline support with history, tab completion, and line editing
+- **Job Control**: Background job management with `jobs`, `fg`, and `bg` commands
+- **Alias Support**: Command aliases with `alias` and `unalias`
+- **Built-in Commands**: `cd`, `pwd`, `exit`, `help`, `jobs`, `fg`, `alias`, `unalias`
+- **Redirection**: Input/output redirection with `>`, `>>`, `<`
+- **Pipelines**: Command chaining with `|`
+- **Signal Handling**: Proper Ctrl+C handling
+- **Cross-Platform**: Works on macOS, Linux, FreeBSD, OpenBSD, and NetBSD
+
+## Cross-Platform Support
+
+### Supported Platforms
+
+| Platform | Package Manager | Dependencies |
+|----------|----------------|--------------|
+| **Ubuntu/Debian** | `apt` | `build-essential libreadline-dev` |
+| **CentOS/RHEL** | `yum` | `Development Tools readline-devel` |
+| **Fedora** | `dnf` | `Development Tools readline-devel` |
+| **Arch Linux** | `pacman` | `base-devel readline` |
+| **macOS** | `brew` | `readline` |
+| **FreeBSD** | `pkg` | `gcc readline` |
+| **OpenBSD** | `pkg_add` | `gcc readline` |
+| **NetBSD** | `pkgin` | `gcc readline` |
 
 ### Quick Start
-```sh
-git clone https://github.com/yourname/ccsh.git
-cd ccsh
-make
+
+#### Automatic Setup (Recommended)
+```bash
+# Clone the repository
+git clone <repository-url>
+cd ccsh-shell
+
+# Install dependencies and build
+./build-and-package.sh -a
 ```
 
-### Build Options
+#### Manual Setup
+```bash
+# 1. Install dependencies (see platform-specific instructions below)
+# 2. Build the project
+make all
 
-**Standard Build** (dynamic linking):
-```sh
-make
+# 3. Run the shell
+./ccsh
 ```
 
-**Static Binary** (self-contained, no external dependencies):
-```sh
-make static
+## Platform-Specific Installation
+
+### Ubuntu/Debian
+```bash
+sudo apt update
+sudo apt install build-essential libreadline-dev
 ```
 
-**Debug Build** (with debug symbols):
-```sh
-make debug
+### CentOS/RHEL/Fedora
+```bash
+# CentOS/RHEL
+sudo yum groupinstall "Development Tools"
+sudo yum install readline-devel
+
+# Fedora
+sudo dnf groupinstall "Development Tools"
+sudo dnf install readline-devel
 ```
 
-**Clean Build** (remove all build artifacts):
-```sh
-make clean
+### Arch Linux
+```bash
+sudo pacman -S --needed base-devel readline
 ```
 
-### Dependencies
+### macOS
+```bash
+# Install Homebrew (if not already installed)
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 
-**Required:**
-- **GCC/Clang**: C compiler
-- **Make**: Build system
-- **Readline**: Command line editing (optional, falls back to basic input)
-
-**Installation by Platform:**
-
-**Ubuntu/Debian:**
-```sh
-sudo apt-get install build-essential libreadline-dev
-```
-
-**macOS:**
-```sh
+# Install dependencies
 brew install readline
 ```
 
-**CentOS/RHEL:**
-```sh
-sudo yum install gcc make readline-devel
+### FreeBSD
+```bash
+sudo pkg install gcc readline
 ```
 
-**Fedora:**
-```sh
-sudo dnf install gcc make readline-devel
+### OpenBSD
+```bash
+sudo pkg_add gcc readline
 ```
 
-**Arch Linux:**
-```sh
-sudo pacman -S base-devel readline
+### NetBSD
+```bash
+sudo pkgin install gcc readline
 ```
 
-## Distribution
+## Build Options
 
-### Creating Distribution Packages
+### Using Makefile
+```bash
+# Standard build
+make all
 
-To create a distributable package:
+# Static binary (Linux/BSD)
+make static
 
-```sh
-./build-and-package.sh
+# Debug build
+make debug
+
+# Clean build artifacts
+make clean
+
+# Check dependencies
+make check-deps
+
+# Show help
+make help
 ```
 
-This script:
-1. **Builds the shell**: Compiles ccsh with appropriate flags for your platform
-2. **Creates package structure**: Organizes files in a platform-specific directory
-3. **Generates scripts**: Creates installation and uninstallation scripts
-4. **Packages everything**: Creates a compressed `.tar.gz` file with checksum
+### Using Build Script
+```bash
+# Full automated build (install deps + build + test)
+./build-and-package.sh -a
 
-### What's Generated
+# Install dependencies only
+./build-and-package.sh -d
 
-The `dist/` folder contains:
+# Check dependencies
+./build-and-package.sh -c
+
+# Build specific type
+./build-and-package.sh -b normal    # Standard build
+./build-and-package.sh -b static    # Static binary
+./build-and-package.sh -b debug     # Debug build
+
+# Test the build
+./build-and-package.sh -t
 ```
-dist/
-├── ccsh-1.0.0-Darwin-arm64/          # Platform-specific directory
-│   ├── ccsh                          # Compiled executable
-│   ├── README.md                      # Documentation
-│   ├── install.sh                     # Installation script
-│   ├── uninstall.sh                   # Uninstallation script
-│   ├── test.sh                        # Test script
-│   ├── PACKAGE_INFO                   # Package information
-│   └── docs/                          # Documentation files
-├── ccsh-1.0.0-Darwin-arm64.tar.gz    # Compressed package
-└── ccsh-1.0.0-Darwin-arm64.tar.gz.sha256  # Checksum for verification
-```
-
-### Platform Detection
-
-The script automatically detects your platform:
-- **macOS**: `ccsh-1.0.0-Darwin-arm64.tar.gz`
-- **Linux x86_64**: `ccsh-1.0.0-Linux-x86_64.tar.gz`
-- **Linux ARM**: `ccsh-1.0.0-Linux-arm64.tar.gz`
-
-### Using the Package
-
-1. **Extract**: `tar -xzf ccsh-1.0.0-Darwin-arm64.tar.gz`
-2. **Install**: `cd ccsh-1.0.0-Darwin-arm64 && ./install.sh`
-3. **Use**: `ccsh` or set as default shell
 
 ## Usage
 
 ### Basic Usage
-```sh
+```bash
+# Start the shell
 ./ccsh
+
+# Run a command and exit
+echo "ls" | ./ccsh
 ```
 
-### Set as Default Shell
-
-**Option 1: User-specific installation**
-```sh
-# Install to user directory
-./build-and-package.sh
-cd dist/ccsh-1.0.0-$(uname -s)-$(uname -m)
-./install.sh
-
-# Add to /etc/shells (requires sudo)
-echo "$HOME/.local/bin/ccsh" | sudo tee -a /etc/shells
-
-# Change your shell
-chsh -s "$HOME/.local/bin/ccsh"
+### Built-in Commands
+```bash
+ccsh> help          # Show help
+ccsh> cd /tmp       # Change directory
+ccsh> pwd           # Print working directory
+ccsh> jobs          # List background jobs
+ccsh> alias ll=ls   # Create alias
+ccsh> unalias ll    # Remove alias
+ccsh> exit          # Exit shell
 ```
-
-**Option 2: System-wide installation**
-```sh
-# Install system-wide (requires sudo)
-sudo ./install.sh
-
-# Add to /etc/shells
-echo "/usr/local/bin/ccsh" | sudo tee -a /etc/shells
-
-# Change your shell
-chsh -s /usr/local/bin/ccsh
-```
-
-**Note**: Log out and log back in to apply the shell change.
-
-### Uninstall
-```sh
-# If installed user-specific
-~/.local/bin/uninstall.sh
-
-# If installed system-wide
-sudo /usr/local/bin/uninstall.sh
-```
-
-## Configuration
-
-### Shell Configuration File
-
-Create `~/.ccshrc` for persistent configuration:
-
-```sh
-# Aliases
-alias ll="ls -lah"
-alias g="git"
-alias ..="cd .."
-alias ...="cd ../.."
-
-# Custom prompt
-export CCSH_PROMPT="ccsh> "
-
-# Welcome message
-echo "Welcome to ccsh, $(whoami)!"
-echo "Current directory: $(pwd)"
-
-# Custom functions
-function mkcd() {
-    mkdir -p "$1" && cd "$1"
-}
-
-# Environment variables
-export EDITOR=vim
-export PATH="$HOME/.local/bin:$PATH"
-```
-
-### Plugin Support
-
-Create plugin files (e.g., `~/.ccsh_plugins/aliases.ccsh`):
-
-```sh
-# ~/.ccsh_plugins/aliases.ccsh
-alias dev="cd ~/projects"
-alias docs="cd ~/documents"
-alias temp="cd /tmp"
-```
-
-Load plugins in your `.ccshrc`:
-
-```sh
-# Load plugins
-if [ -f ~/.ccsh_plugins/aliases.ccsh ]; then
-    source ~/.ccsh_plugins/aliases.ccsh
-fi
-```
-
-
-## Built-in Commands
-
-### Navigation
-- **cd**: Change directory
-- **pwd**: Print working directory
 
 ### Job Control
-- **jobs**: List background jobs
-- **fg**: Bring job to foreground
+```bash
+ccsh> sleep 10 &    # Run in background
+ccsh> jobs          # List background jobs
+ccsh> fg 0          # Bring job to foreground
+```
 
-### Shell Control
-- **exit**: Exit the shell
-- **help**: Show help information
+### Redirection and Pipelines
+```bash
+ccsh> ls > files.txt        # Output redirection
+ccsh> cat < files.txt       # Input redirection
+ccsh> ls | grep .c          # Pipeline
+ccsh> echo "test" >> log    # Append redirection
+```
 
-### Alias Management
-- **alias**: Create or list aliases
-- **unalias**: Remove aliases
+## Development
 
-### File Operations
-- **which**: Find command location in PATH
-- **path**: Show PATH environment variable
+### Project Structure
+```
+ccsh-shell/
+├── main.c                 # Main shell implementation
+├── Makefile              # Cross-platform build configuration
+├── build-and-package.sh  # Automated build script
+├── test.sh              # Test suite
+├── README.md            # This file
+└── docs/                # Documentation
+```
 
-### Text Processing
-- **grep**: Built-in grep with options (-i, -n, -v, -c)
+### Building for Different Platforms
 
-### Examples
-```sh
-# Navigation
-cd /tmp
-pwd
+The build system automatically detects your platform and configures the appropriate compiler flags and libraries:
 
-# Job control
-sleep 10 &
-jobs
-fg %1
+- **Linux**: Uses `-lreadline -lncurses -ltinfo` for static builds
+- **macOS**: Uses `-lreadline` (static linking limited)
+- **BSD**: Uses `-lreadline -lncurses` for static builds
 
-# Aliases
-alias ll="ls -lah"
-alias g="git"
-unalias g
+### Debugging
+```bash
+# Build with debug symbols
+make debug
 
-# File operations
-which ls
-path
-
-# Text processing
-grep -i "hello" file.txt
-grep -n "error" *.log
+# Run with debug output
+./ccsh
 ```
 
 ## Testing
 
-### Run Tests
-```sh
+```bash
+# Run the test suite
 make test
+
+# Or use the build script
+./build-and-package.sh -t
 ```
 
-### Manual Testing
-```sh
-# Test basic functionality
-./ccsh
-ccsh> ls -la
-ccsh> pwd
-ccsh> cd /tmp
-ccsh> exit
+## Troubleshooting
 
-# Test job control
-./ccsh
-ccsh> sleep 5 &
-ccsh> jobs
-ccsh> fg %1
+### Common Issues
 
-# Test aliases
-./ccsh
-ccsh> alias ll="ls -lah"
-ccsh> ll
-ccsh> alias
-ccsh> unalias ll
+1. **"readline/readline.h: No such file or directory"**
+   - Install readline development headers for your platform
+   - Use `./build-and-package.sh -d` to install dependencies
 
-# Test I/O redirection
-./ccsh
-ccsh> echo "hello" > test.txt
-ccsh> cat < test.txt
-ccsh> echo "world" >> test.txt
-ccsh> cat test.txt
+2. **Static linking fails on macOS**
+   - macOS has limitations with static linking
+   - Use `make all` instead of `make static`
 
-# Test globbing
-ccsh> ls *.txt
-ccsh> ls test?.txt
-```
+3. **Build fails on unknown Linux distribution**
+   - Install manually: `gcc`, `make`, `readline-dev`
+   - Or use the build script: `./build-and-package.sh -d`
 
-## Documentation
+### Platform-Specific Notes
 
-### Core Documentation
-- [Shell Introduction](docs/Shell%20Introduction.md) - Overview of shell concepts and features
-- [Makefile Introduction](docs/Makefile%20Introduction.md) - How Makefiles work and C program distribution
-- [Coding Dive](docs/Coding%20Dive.md) - Technical implementation details
-- [Distribution Process](docs/Distribution%20Process.md) - How the dist/ folder is generated
-
-### Quick References
-- [Makefile Quick Reference](docs/Makefile%20Quick%20Reference.md) - Common make commands and patterns
-- [Distribution Example](docs/Distribution%20Example.md) - How to use the distribution package
-
-### Learning Path
-1. **Start with**: [Shell Introduction](docs/Shell%20Introduction.md) for basic concepts
-2. **Build process**: [Makefile Introduction](docs/Makefile%20Introduction.md) for understanding compilation
-3. **Implementation**: [Coding Dive](docs/Coding%20Dive.md) for technical details
-4. **Distribution**: [Distribution Process](docs/Distribution%20Process.md) for packaging
-
-## Features
-
-### Core Shell Features
-- **Command Execution**: Run external programs and built-in commands
-- **I/O Redirection**: `<`, `>`, `>>` for input/output redirection
-- **Background Jobs**: Run commands in background with `&`
-- **Job Control**: Manage background jobs with `jobs` and `fg`
-- **Signal Handling**: Handle Ctrl+C and other signals gracefully
-
-### Advanced Features
-- **Command History**: Arrow keys for command history (with readline)
-- **Alias System**: Create shortcuts for commands
-- **Globbing**: Wildcard expansion (`*`, `?`)
-- **Built-in Commands**: Essential commands implemented in the shell
-- **Cross-platform**: Works on Linux and macOS
-
-### Development Features
-- **POSIX Compliance**: Follows POSIX standards for portability
-- **Modular Design**: Clean, maintainable C code
-- **Comprehensive Testing**: Automated and manual testing
-- **Professional Packaging**: Automated distribution system
-
-## Examples
-
-### Basic Usage
-```sh
-# Start the shell
-./ccsh
-
-# Run commands
-ccsh> ls -la
-ccsh> pwd
-ccsh> cd /tmp
-
-# Use aliases
-ccsh> alias ll="ls -lah"
-ccsh> ll
-
-# Background jobs
-ccsh> sleep 10 &
-ccsh> jobs
-ccsh> fg %1
-```
-
-### I/O Redirection
-```sh
-# Output redirection
-ccsh> echo "hello" > file.txt
-ccsh> cat file.txt
-
-# Input redirection
-ccsh> cat < file.txt
-
-# Append redirection
-ccsh> echo "world" >> file.txt
-
-# Error redirection
-ccsh> ls nonexistent 2> error.log
-```
-
-### Globbing
-```sh
-# List all .txt files
-ccsh> ls *.txt
-
-# List files with specific pattern
-ccsh> ls test?.txt
-
-# List files in subdirectories
-ccsh> ls **/*.c
-```
+- **macOS**: Static linking is limited due to system restrictions
+- **FreeBSD**: May require additional ncurses libraries
+- **OpenBSD**: Uses different package manager (`pkg_add`)
+- **NetBSD**: Uses `pkgin` package manager
 
 ## Contributing
 
-### Development Setup
-```sh
-# Clone the repository
-git clone https://github.com/yourname/ccsh.git
-cd ccsh
-
-# Build for development
-make debug
-
-# Run tests
-make test
-
-# Create distribution package
-./build-and-package.sh
-```
-
-### Code Style
-- Follow C coding standards
-- Use meaningful variable and function names
-- Add comments for complex logic
-- Test changes thoroughly
-
-### Reporting Issues
-- Check existing issues first
-- Provide detailed reproduction steps
-- Include system information (OS, architecture)
-- Test with latest version
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Test on multiple platforms
+5. Submit a pull request
 
 ## License
 
-This project is open source. See [LICENSE](LICENSE) for details.
+[Add your license information here]
 
 ## Acknowledgments
 
-- **Readline Library**: For command line editing features
-- **POSIX Standards**: For portable shell implementation
-- **Unix Philosophy**: For simple, composable design
+- GNU Readline library for interactive command line editing
+- POSIX standards for shell compatibility
