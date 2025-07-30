@@ -184,11 +184,11 @@ ccsh> echo "test" >> log    # Append redirection
 ```
 ccsh-shell/
 ├── main.c                 # Main shell implementation
-├── Makefile              # Cross-platform build configuration
-├── build-and-package.sh  # Automated build script
-├── test.sh              # Test suite
-├── README.md            # This file
-└── docs/                # Documentation
+├── Makefile               # Cross-platform build configuration
+├── build-and-package.sh   # Automated build script
+├── test.sh                # Test suite
+├── README.md              # This file
+└── docs/                  # Documentation
 ```
 
 ### Building for Different Platforms
@@ -248,10 +248,6 @@ make test
 3. Make your changes
 4. Test on multiple platforms
 5. Submit a pull request
-
-## License
-
-[Add your license information here]
 
 ## Acknowledgments
 
