@@ -73,6 +73,7 @@ run: ccsh
 clean:
 	@echo "[INFO] Cleaning build artifacts..."
 	rm -f ccsh *.o
+	rm -rf ccsh.dsym
 
 test: ccsh test.sh
 	@echo "[INFO] Running tests..."
