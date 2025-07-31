@@ -1,11 +1,15 @@
+# Cursor
 .cursor/*
 .cursorignore
 !.cursor/*.example*
 
+# VSCode
 .vscode/*
 !.vscode/*.example*
 
+# ccsh
 .ccsh_history
+ccsh.dSYM/*
 
 # Build artifacts
 *.o

@@ -168,6 +168,147 @@ test_build() {
     rm -f /tmp/ccsh_test.out
 }
 
+# Create distribution package
+create_package() {
+    echo -e "${BLUE}[INFO] Creating distribution package...${NC}"
+    
+    if [ ! -f "ccsh" ]; then
+        echo -e "${RED}[ERROR] ccsh binary not found. Build first with -b option${NC}"
+        exit 1
+    fi
+    
+    # Configuration
+    VERSION="1.0.0"
+    NAME="ccsh"
+    DESCRIPTION="Compact C Shell - A small yet flexible Unix-like shell in C"
+    
+    # Platform detection
+    OS=$(uname -s)
+    ARCH=$(uname -m)
+    
+    # Get executable size
+    EXEC_SIZE=$(ls -lh ccsh | awk '{print $5}')
+    
+    # Create distribution directory
+    DIST_DIR="dist/$NAME-$VERSION-$OS-$ARCH"
+    mkdir -p "$DIST_DIR"
+    
+    echo -e "${BLUE}[INFO] Creating package: $DIST_DIR${NC}"
+    
+    # Copy files
+    cp ccsh "$DIST_DIR/"
+    cp README.md "$DIST_DIR/" 2>/dev/null || echo -e "${YELLOW}[WARN] README.md not found${NC}"
+    cp test.sh "$DIST_DIR/" 2>/dev/null || echo -e "${YELLOW}[WARN] test.sh not found${NC}"
+    
+    # Create installation script
+    cat > "$DIST_DIR/install.sh" << 'EOF'
+#!/bin/bash
+# install.sh - Installation script for ccsh
+
+set -e
+
+echo "Installing ccsh..."
+
+# Check if running as root for system-wide installation
+if [ "$EUID" -eq 0 ]; then
+    INSTALL_DIR="/usr/local/bin"
+    echo "Installing system-wide to $INSTALL_DIR"
+else
+    INSTALL_DIR="$HOME/.local/bin"
+    echo "Installing to user directory: $INSTALL_DIR"
+    mkdir -p "$INSTALL_DIR"
+fi
+
+# Copy executable
+cp ccsh "$INSTALL_DIR/"
+chmod +x "$INSTALL_DIR/ccsh"
+
+echo "ccsh installed successfully to $INSTALL_DIR/ccsh"
+echo ""
+echo "To use ccsh as your default shell:"
+echo "1. Add to /etc/shells (requires sudo):"
+echo "   echo '$INSTALL_DIR/ccsh' | sudo tee -a /etc/shells"
+echo "2. Change your shell:"
+echo "   chsh -s $INSTALL_DIR/ccsh"
+echo "3. Log out and log back in"
+echo ""
+echo "To run ccsh directly:"
+echo "   $INSTALL_DIR/ccsh"
+EOF
+
+    # Create uninstallation script
+    cat > "$DIST_DIR/uninstall.sh" << 'EOF'
+#!/bin/bash
+# uninstall.sh - Uninstallation script for ccsh
+
+set -e
+
+echo "Uninstalling ccsh..."
+
+# Check if running as root for system-wide installation
+if [ "$EUID" -eq 0 ]; then
+    INSTALL_DIR="/usr/local/bin"
+else
+    INSTALL_DIR="$HOME/.local/bin"
+fi
+
+if [ -f "$INSTALL_DIR/ccsh" ]; then
+    rm -f "$INSTALL_DIR/ccsh"
+    echo "ccsh removed from $INSTALL_DIR"
+else
+    echo "ccsh not found in $INSTALL_DIR"
+fi
+
+echo "Uninstallation complete"
+EOF
+
+    # Create package information
+    cat > "$DIST_DIR/PACKAGE_INFO" << EOF
+Package: $NAME
+Version: $VERSION
+Description: $DESCRIPTION
+OS: $OS
+Architecture: $ARCH
+Build Date: $(date)
+Executable Size: $EXEC_SIZE
+
+Files included:
+- ccsh (main executable)
+- README.md (documentation)
+- install.sh (installation script)
+- uninstall.sh (uninstallation script)
+- test.sh (test script, if available)
+
+Installation:
+1. Extract the package
+2. Run: ./install.sh
+3. Follow the instructions provided
+
+Usage:
+- Run directly: ./ccsh
+- Set as default shell: Follow install.sh instructions
+EOF
+
+    # Make scripts executable
+    chmod +x "$DIST_DIR/install.sh"
+    chmod +x "$DIST_DIR/uninstall.sh"
+    chmod +x "$DIST_DIR/ccsh"
+    
+    # Create compressed package
+    cd dist
+    PACKAGE_NAME="$NAME-$VERSION-$OS-$ARCH.tar.gz"
+    tar -czf "$PACKAGE_NAME" "$NAME-$VERSION-$OS-$ARCH/"
+    
+    # Create checksum for verification
+    sha256sum "$PACKAGE_NAME" > "$PACKAGE_NAME.sha256"
+    
+    echo -e "${GREEN}[SUCCESS] Package created: $PACKAGE_NAME${NC}"
+    echo -e "${BLUE}[INFO] Package size: $(ls -lh "$PACKAGE_NAME" | awk '{print $5}')${NC}"
+    echo -e "${BLUE}[INFO] Checksum: $PACKAGE_NAME.sha256${NC}"
+    
+    cd ..
+}
+
 # Show help
 show_help() {
     echo "Usage: $0 [OPTIONS]"
@@ -178,13 +319,15 @@ show_help() {
     echo "  -c, --check         Check dependencies"
     echo "  -b, --build TYPE    Build project (TYPE: normal, static, debug)"
     echo "  -t, --test          Test the build"
-    echo "  -a, --all           Install deps, build, and test"
+    echo "  -p, --package       Create distribution package"
+    echo "  -a, --all           Install deps, build, test, and package"
     echo ""
     echo "Examples:"
     echo "  $0 -d              # Install dependencies"
     echo "  $0 -b normal       # Build normally"
     echo "  $0 -b static       # Build static binary"
-    echo "  $0 -a              # Full build process"
+    echo "  $0 -p              # Create distribution package"
+    echo "  $0 -a              # Full build process with packaging"
 }
 
 # Main script
@@ -193,6 +336,7 @@ main() {
     local check_deps=false
     local build_type="normal"
     local test_build_flag=false
+    local package_flag=false
     local all_flag=false
     
     # Parse command line arguments
@@ -218,6 +362,10 @@ main() {
                 test_build_flag=true
                 shift
                 ;;
+            -p|--package)
+                package_flag=true
+                shift
+                ;;
             -a|--all)
                 all_flag=true
                 shift
@@ -235,6 +383,7 @@ main() {
         install_deps=true
         build_type="normal"
         test_build_flag=true
+        package_flag=true
     fi
     
     # Install dependencies if requested
@@ -255,6 +404,11 @@ main() {
     # Test if requested
     if [ "$test_build_flag" = true ]; then
         test_build
+    fi
+    
+    # Create package if requested
+    if [ "$package_flag" = true ]; then
+        create_package
     fi
     
     echo -e "${GREEN}[SUCCESS] All operations completed successfully${NC}"

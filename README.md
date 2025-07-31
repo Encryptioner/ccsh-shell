@@ -123,7 +123,7 @@ make help
 
 ### Using Build Script
 ```bash
-# Full automated build (install deps + build + test)
+# Full automated build (install deps + build + test + package)
 ./build-and-package.sh -a
 
 # Install dependencies only
@@ -139,7 +139,29 @@ make help
 
 # Test the build
 ./build-and-package.sh -t
+
+# Create distribution package
+./build-and-package.sh -p
+
+# Build and package
+./build-and-package.sh -b normal -p
 ```
+
+## Distribution Package
+
+The build script can create a distribution package with all necessary files:
+
+```bash
+# Create distribution package
+./build-and-package.sh -p
+```
+
+This creates a `dist/` folder with:
+- Compiled executable
+- Installation/uninstallation scripts
+- Documentation
+- Test scripts
+- Compressed tar.gz package with checksum
 
 ## Usage
 
@@ -184,11 +206,11 @@ ccsh> echo "test" >> log    # Append redirection
 ```
 ccsh-shell/
 ├── main.c                 # Main shell implementation
-├── Makefile              # Cross-platform build configuration
-├── build-and-package.sh  # Automated build script
-├── test.sh              # Test suite
-├── README.md            # This file
-└── docs/                # Documentation
+├── Makefile               # Cross-platform build configuration
+├── build-and-package.sh   # Automated build script
+├── test.sh                # Test suite
+├── README.md              # This file
+└── docs/                  # Documentation
 ```
 
 ### Building for Different Platforms
@@ -248,10 +270,6 @@ make test
 3. Make your changes
 4. Test on multiple platforms
 5. Submit a pull request
-
-## License
-
-[Add your license information here]
 
 ## Acknowledgments
 
