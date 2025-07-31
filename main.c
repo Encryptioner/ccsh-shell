@@ -11,18 +11,6 @@
  * - Alias system
  * - Signal handling (Ctrl+C)
  * 
- * Libraries used:
- * - stdio.h: Standard I/O operations (printf, fprintf, perror)
- * - stdlib.h: Memory management (malloc, free, exit)
- * - string.h: String manipulation (strcmp, strcpy, strtok, etc.)
- * - unistd.h: POSIX system calls (fork, exec, chdir, getcwd)
- * - sys/wait.h: Process control (waitpid, WNOHANG)
- * - fcntl.h: File control operations (open, O_RDONLY, O_WRONLY, etc.)
- * - glob.h: Pathname pattern matching (glob, GLOB_TILDE)
- * - signal.h: Signal handling (signal, SIGINT)
- * - errno.h: Error codes and error handling
- * - readline/readline.h: Interactive command line editing (readline, add_history)
- * - readline/history.h: Command history management
  */
 
 #include <stdio.h>      /* Standard I/O operations: printf, fprintf, perror, fflush */
@@ -39,7 +27,7 @@
 /* Readline library support - cross-platform detection */
 #if defined(__APPLE__) || defined(__linux__) || defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__NetBSD__)
     #ifdef HAVE_READLINE
-        #include <readline/readline.h>  /* Interactive command line editing */
+        #include <readline/readline.h>  /* Interactive command line editing (readline, add_history) */
         #include <readline/history.h>   /* Command history management */
         #define READLINE_LIB 1
     #else
@@ -73,10 +61,15 @@ int job_count = 0;
 Alias aliases[MAX_ALIASES];
 int alias_count = 0;
 
+/* Function declarations */
+void generate_prompt(char* prompt, size_t prompt_size);
+
 /* Signal handler for Ctrl+C (SIGINT) */
 void sigint_handler(int sig) {
     (void)sig;  /* Suppress unused parameter warning */
-    printf("\nUse 'exit' to quit.\nccsh> ");
+    char prompt[1024];
+    generate_prompt(prompt, sizeof(prompt));
+    printf("\nUse 'exit' to quit.\n%s", prompt);
     fflush(stdout);  /* Ensure prompt is displayed immediately */
 }
 
@@ -472,12 +465,74 @@ int builtin_grep(char** args) {
 }
 
 /**
+ * Generate prompt with current directory
+ * @param prompt Buffer to store the prompt
+ * @param prompt_size Size of prompt buffer
+ */
+void generate_prompt(char* prompt, size_t prompt_size) {
+    char cwd[1024];
+    if (getcwd(cwd, sizeof(cwd)) != NULL) {
+        /* Try to make the path more readable by shortening home directory */
+        const char* home = getenv("HOME");
+        if (home && strncmp(cwd, home, strlen(home)) == 0) {
+            /* Replace home directory with ~ */
+            snprintf(prompt, prompt_size, "ccsh:~%s> ", cwd + strlen(home));
+        } else {
+            snprintf(prompt, prompt_size, "ccsh:%s> ", cwd);
+        }
+    } else {
+        /* Fallback if getcwd fails */
+        snprintf(prompt, prompt_size, "ccsh> ");
+    }
+}
+
+/**
+ * Expand tilde (~) to home directory
+ * @param path Path that may contain tilde
+ * @param expanded Buffer to store expanded path
+ * @param expanded_size Size of expanded buffer
+ * @return 0 on success, -1 on error
+ */
+int expand_tilde(const char* path, char* expanded, size_t expanded_size) {
+    if (!path || !expanded) return -1;
+    
+    if (path[0] == '~') {
+        const char* home = getenv("HOME");
+        if (!home || strlen(home) == 0) {
+            fprintf(stderr, "cd: HOME environment variable not set\n");
+            return -1;
+        }
+        
+        if (path[1] == '\0' || path[1] == '/') {
+            /* ~ or ~/path */
+            if (path[1] == '/') {
+                snprintf(expanded, expanded_size, "%s%s", home, path + 1);
+            } else {
+                snprintf(expanded, expanded_size, "%s", home);
+            }
+        } else {
+            /* ~username - not supported in this simple implementation */
+            fprintf(stderr, "cd: ~username not supported\n");
+            return -1;
+        }
+    } else {
+        /* No tilde, copy as-is */
+        strncpy(expanded, path, expanded_size - 1);
+        expanded[expanded_size - 1] = '\0';
+    }
+    
+    return 0;
+}
+
+/**
  * Display help information about shell features
  */
 void print_help() {
     printf("ccsh - Compact C Shell\n");
     printf("Supported features:\n");
     printf("  Built-in commands: cd, pwd, exit, help, fg, jobs, alias, unalias, path, which, grep\n");
+    printf("  Tilde expansion: ~ expands to home directory (e.g., cd ~, cd ~/Documents)\n");
+    printf("  Dynamic prompt: Shows current directory in prompt (e.g., ccsh:~> ccsh:/usr/bin>)\n");
     printf("  External programs: All programs in PATH (e.g., sudo, ls, cat, etc.)\n");
     printf("  I/O Redirection: < (input), > (output), >> (append)\n");
     printf("  Background jobs: & (with fg and jobs to control)\n");
@@ -489,6 +544,8 @@ void print_help() {
     printf("  path                    - Show PATH environment variable\n");
     printf("  which ls                - Find location of ls command\n");
     printf("  which sudo              - Find location of sudo command\n");
+    printf("  cd ~                    - Change to home directory\n");
+    printf("  cd ~/Documents          - Change to Documents in home directory\n");
     printf("  sudo ls -la             - Run sudo with arguments\n");
     printf("  ls *.txt > files.txt   - Redirect output to file\n");
     printf("  sleep 10 &             - Run command in background\n");
@@ -510,10 +567,14 @@ int main() {
     #endif
 
     char* line;
+    char prompt[1024];
     while (1) {
+        /* Generate dynamic prompt with current directory */
+        generate_prompt(prompt, sizeof(prompt));
+        
         /* Get command line input */
         #if READLINE_LIB
-        line = readline("ccsh> ");
+        line = readline(prompt);
         if (line == NULL) {
             /* EOF or readline error - exit gracefully */
             printf("\n");
@@ -521,7 +582,7 @@ int main() {
         }
         #else
         static char buffer[1024];
-        printf("ccsh> ");
+        printf("%s", prompt);
         if (!fgets(buffer, sizeof(buffer), stdin)) break;
         buffer[strcspn(buffer, "\n")] = 0;  /* Remove newline */
         line = strdup(buffer);
@@ -562,11 +623,13 @@ int main() {
         
         /* Change directory */
         if (strcmp(args[0], "cd") == 0) {
-            const char* target = args[1] ? args[1] : getenv("HOME");
-            if (!target) {
-                fprintf(stderr, "cd: HOME environment variable not set\n");
-            } else if (chdir(target) != 0) {
-                perror("cd");
+            char expanded_path[1024];
+            const char* target = args[1] ? args[1] : "~";
+            
+            if (expand_tilde(target, expanded_path, sizeof(expanded_path)) == 0) {
+                if (chdir(expanded_path) != 0) {
+                    perror("cd");
+                }
             }
             free(line);
             continue;
