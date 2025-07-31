@@ -1,6 +1,6 @@
 # Distribution Example
 
-This document shows how to use the distribution package created by `build-and-package.sh`.
+This document shows how to use the distribution package created by `build-and-package.sh -p`.
 
 ## Package Contents
 
@@ -13,6 +13,7 @@ ccsh-1.0.0-Darwin-arm64/
 ├── uninstall.sh           # Uninstallation script
 ├── test.sh                # Test script
 ├── PACKAGE_INFO           # Package information
+├── README.md              # Documentation
 ```
 
 ## Installation Steps

@@ -4,7 +4,15 @@ This document explains the step-by-step process of how the `dist/` folder is cre
 
 ## 🔧 The Build and Package Script
 
-The `build-and-package.sh` script automates the entire distribution process:
+The `build-and-package.sh` script automates the entire distribution process. To create a distribution package, run:
+
+```bash
+# Full automated process (install deps + build + test + package)
+./build-and-package.sh -a
+
+# Or build and package separately
+./build-and-package.sh -b normal -p
+```
 
 ### **Step 1: Environment Setup**
 ```bash
@@ -47,14 +55,12 @@ mkdir -p "$DIST_DIR"
 cp ccsh "$DIST_DIR/"
 cp README.md "$DIST_DIR/"
 cp test.sh "$DIST_DIR/"
-cp docs/*.md "$DIST_DIR/"
 ```
 
 **Files included in package:**
 - **ccsh**: Compiled executable
 - **README.md**: Project documentation
 - **test.sh**: Test script
-- **docs/**: All documentation files
 
 ### **Step 4: Script Generation**
 
@@ -167,7 +173,7 @@ sha256sum "$PACKAGE_NAME" > "$PACKAGE_NAME.sha256"
 
 ## 📁 Final Directory Structure
 
-After running `./build-and-package.sh`, you get:
+After running `./build-and-package.sh -a` or `./build-and-package.sh -p`, you get:
 
 ```
 ccsh-shell/
@@ -184,14 +190,9 @@ ccsh-shell/
 │   │   ├── uninstall.sh     # Uninstallation script
 │   │   ├── test.sh          # Test script
 │   │   ├── PACKAGE_INFO     # Package metadata
-│   │   └── docs/            # Documentation files
 │   ├── ccsh-1.0.0-Darwin-arm64.tar.gz
 │   └── ccsh-1.0.0-Darwin-arm64.tar.gz.sha256
-└── docs/                     # Source documentation
-    ├── Shell Introduction.md
-    ├── Makefile Introduction.md
-    ├── Coding Dive.md
-    └── Distribution Process.md
+└── docs/*                   # Source documentation
 ```
 
 ## 🔍 Platform-Specific Details
@@ -250,7 +251,6 @@ fi
 
 ### **Documentation**
 - **README.md**: Project overview and usage
-- **docs/**: Complete documentation set
 - **PACKAGE_INFO**: Package metadata
 
 ### **Scripts**

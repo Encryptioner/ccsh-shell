@@ -12,9 +12,9 @@ This document explains the unfamiliar terms and concepts in the ccsh shell imple
 
 ### **POSIX Standards**
 - **POSIX.1**: Core system calls and C library functions
-- **POSIX.2**: Shell and utilities (commands like ls, grep, awk)
 - **POSIX.1b**: Real-time extensions
 - **POSIX.1c**: Threads
+- **POSIX.2**: Shell and utilities (commands like ls, grep, awk)
 
 ### **Why POSIX Matters for Shells**
 ```c
